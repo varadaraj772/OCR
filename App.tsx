@@ -19,7 +19,7 @@ const App = () => {
   const genAI = new GoogleGenerativeAI(API_KEY);
   const model = genAI.getGenerativeModel({model: 'gemini-1.5-flash'});
   const [imageUri, setImageUri] = useState(null);
-  const [recognizedText, setRecognizedText] = useState('');
+  const [recognizedText, setRecognizedText] = useState();
   const [isLoading, setIsLoading] = useState(false);
   // const [txt, setTxt] = useState();
 
@@ -39,7 +39,6 @@ const App = () => {
     // });
     const {scannedImages} = await DocumentScanner.scanDocument();
     if (scannedImages.length > 0) {
-      // set the img src, so we can view the first scanned image
       setImageUri(scannedImages[0]);
       console.log(scannedImages);
     }
@@ -59,19 +58,7 @@ const App = () => {
           'give formatted text in json format and dont include terms and conditions';
         const Gresult = await model.generateContent([prompt, result.text]);
         const response = Gresult.response;
-        let text = response.text();
-        console.log(
-          '-------------------------------------------------------------------------------------',
-        );
-        text = text.replace(/json|`/g, '');
-        setRecognizedText(text);
-        //console.log(recognizedText);
-        JSON.stringify(recognizedText);
-        JSON.parse(recognizedText);
-        console.log(recognizedText);
-        console.log(
-          '-------------------------------------------------------------------------------------',
-        );
+        setRecognizedText(response.text().replace(/json|`/g, ''));
       } catch (error) {
         console.error(error);
         setRecognizedText('Error extracting text');
