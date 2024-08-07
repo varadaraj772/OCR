@@ -1,3 +1,4 @@
+// TODO: yarn add @google/generative-ai react-native-document-scanner-plugin @react-native-ml-kit/text-recognition react-native-dotenv
 import React, {useEffect, useState} from 'react';
 import {GoogleGenerativeAI} from '@google/generative-ai';
 import {
@@ -20,6 +21,7 @@ const App = () => {
   const [imageUri, setImageUri] = useState(null);
   const [recognizedText, setRecognizedText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // const [txt, setTxt] = useState();
 
   // const pickImage = async () => {
   //   ImagePicker.openPicker({
@@ -53,12 +55,23 @@ const App = () => {
         // ]);
         const result = await TextRecognition.recognize(imageUri);
         // setRecognizedText(result.text);
-        const prompt = 'give formatted text in json format';
+        const prompt =
+          'give formatted text in json format and dont include terms and conditions';
         const Gresult = await model.generateContent([prompt, result.text]);
-        const response = await Gresult.response;
-        const text = response.text();
-        console.log(text);
+        const response = Gresult.response;
+        let text = response.text();
+        console.log(
+          '-------------------------------------------------------------------------------------',
+        );
+        text = text.replace(/json|`/g, '');
         setRecognizedText(text);
+        //console.log(recognizedText);
+        JSON.stringify(recognizedText);
+        JSON.parse(recognizedText);
+        console.log(recognizedText);
+        console.log(
+          '-------------------------------------------------------------------------------------',
+        );
       } catch (error) {
         console.error(error);
         setRecognizedText('Error extracting text');
