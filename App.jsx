@@ -51,7 +51,7 @@ Extract the following details from the given text and format them into a JSON ob
       {
         "description": "string",
         "hsnCode": "string",
-        "unit": "string",
+        "unit": "number",
         "quantity": "number",
         "rate": "number",
         "amount": "number"
@@ -59,7 +59,7 @@ Extract the following details from the given text and format them into a JSON ob
     ]
   }
 }
-Do not include any other information such as terms and conditions. Ensure the keys are named exactly as specified: "description", "hsnCode", "number of units", "quantity", "rate", and "amount".
+Do not include any other information such as terms and conditions. Ensure the keys are named exactly as specified: "description", "hsnCode", "number of units", "quantity", "rate", and "amount and please extract number of units correctly which is a number not KG/Ton".
 `;
 
         const Gresult = await model.generateContent([prompt, result.text]);
@@ -70,7 +70,7 @@ Do not include any other information such as terms and conditions. Ensure the ke
         console.log(
           '_________________________PARSED DATA_______________________________________',
         );
-        console.log(parsedData);
+        console.log(result.text);
         setRecognizedText(parsedData.invoice);
         if (parsedData.invoice && parsedData.invoice.items) {
           setFormData(
@@ -110,22 +110,22 @@ Do not include any other information such as terms and conditions. Ensure the ke
     );
   };
 
-  const validateFields = () => {
-    for (const item of formData) {
-      if (
-        !item.description ||
-        !item.hsnCode ||
-        !item.unit ||
-        !item.quantity ||
-        !item.rate ||
-        !item.amount
-      ) {
-        Alert.alert('Validation Error', 'All fields are required.');
-        return false;
-      }
-    }
-    return true;
-  };
+  // const validateFields = () => {
+  //   for (const item of formData) {
+  //     if (
+  //       !item.description ||
+  //       !item.hsnCode ||
+  //       !item.unit ||
+  //       !item.quantity ||
+  //       !item.rate ||
+  //       !item.amount
+  //     ) {
+  //       Alert.alert('Validation Error', 'All fields are required.');
+  //       return false;
+  //     }
+  //   }
+  //   return true;
+  // };
 
   const renderItem = ({item}) => (
     <View style={styles.inputContainer}>
