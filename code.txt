@@ -1,0 +1,370 @@
+import React, {useState} from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  Button,
+  FlatList,
+  TouchableOpacity,
+} from 'react-native';
+
+const App = () => {
+  // State for Template 1 (single-entry and dynamic fields)
+  const [template1Data, setTemplate1Data] = useState({
+    gstinNumber: '',
+    invoiceNo: '',
+    date: '',
+    phoneNumber: '',
+    vehicleNumber: '',
+    custGstnNo: '',
+    subtotal: '',
+    weightmentCharges: '',
+    coolieAndHandlingCharges: '',
+    cgst: '',
+    sgst: '',
+    roundOff: '',
+    total: '',
+    ewayBillNo: '',
+  });
+
+  const [template1DynamicData, setTemplate1DynamicData] = useState([
+    {
+      id: '1',
+      descriptionOfGoods: '',
+      hsnCode: '',
+      numberOfUnits: '',
+      qty: '',
+      rate: '',
+      amount: '',
+    },
+  ]);
+
+  // State for Template 2 (single-entry and dynamic fields)
+  const [template2Data, setTemplate2Data] = useState({
+    sellerName: '',
+    itPanNo: '',
+    gstin: '',
+    cin: '',
+    invoiceNo: '',
+    date: '',
+    internalNo: '',
+    soNoAndDate: '',
+    product: '',
+    dispatchFrom: '',
+    irn: '',
+    totalGrossWt: '',
+    totalNetWt: '',
+    totalBasicValueRs: '',
+    totalAddFreightRs: '',
+    totalTaxableValueRs: '',
+    totalCgstAmountRs: '',
+    totalSgstAmountRs: '',
+    totalIgstAmount: '',
+    totalGst: '',
+    totalInvoice: '',
+  });
+
+  const [template2DynamicData, setTemplate2DynamicData] = useState([
+    {
+      id: '1',
+      descriptionOfGoods: '',
+      batchCode: '',
+      noOfBundles: '',
+      hsnSacCode: '',
+      uom: '',
+      grossWt: '',
+      netWt: '',
+      exMillRate: '',
+      rebate: '',
+      basic: '',
+      basicValueRs: '',
+      addFreightRs: '',
+      taxableValueRs: '',
+      cgstAmountRs: '',
+      sgstAmountRs: '',
+      igstAmount: '',
+    },
+  ]);
+
+  // Template 1 - Handle single-entry field changes
+  const handleTemplate1SingleChange = (field, value) => {
+    setTemplate1Data({...template1Data, [field]: value});
+  };
+
+  // Template 1 - Handle dynamic-entry field changes
+  const handleTemplate1DynamicChange = (id, field, value) => {
+    setTemplate1DynamicData(prevData =>
+      prevData.map(item => (item.id === id ? {...item, [field]: value} : item)),
+    );
+  };
+
+  // Template 1 - Add a new set of dynamic-entry fields
+  const addTemplate1DynamicEntry = () => {
+    const newId = (template1DynamicData.length + 1).toString();
+    setTemplate1DynamicData([
+      ...template1DynamicData,
+      {
+        id: newId,
+        descriptionOfGoods: '',
+        hsnCode: '',
+        numberOfUnits: '',
+        qty: '',
+        rate: '',
+        amount: '',
+      },
+    ]);
+  };
+
+  // Template 1 - Remove a set of dynamic-entry fields
+  const removeTemplate1DynamicEntry = id => {
+    setTemplate1DynamicData(
+      template1DynamicData.filter(item => item.id !== id),
+    );
+  };
+
+  // Template 1 - Handle submission
+  const handleTemplate1Submit = () => {
+    console.log('Template 1 Single Entry Data:', template1Data);
+    console.log('Template 1 Dynamic Data:', template1DynamicData);
+    // Add your submission logic here
+  };
+
+  // Template 2 - Handle single-entry field changes
+  const handleTemplate2SingleChange = (field, value) => {
+    setTemplate2Data({...template2Data, [field]: value});
+  };
+
+  // Template 2 - Handle dynamic-entry field changes
+  const handleTemplate2DynamicChange = (id, field, value) => {
+    setTemplate2DynamicData(prevData =>
+      prevData.map(item => (item.id === id ? {...item, [field]: value} : item)),
+    );
+  };
+
+  // Template 2 - Add a new set of dynamic-entry fields
+  const addTemplate2DynamicEntry = () => {
+    const newId = (template2DynamicData.length + 1).toString();
+    setTemplate2DynamicData([
+      ...template2DynamicData,
+      {
+        id: newId,
+        descriptionOfGoods: '',
+        batchCode: '',
+        noOfBundles: '',
+        hsnSacCode: '',
+        uom: '',
+        grossWt: '',
+        netWt: '',
+        exMillRate: '',
+        rebate: '',
+        basic: '',
+        basicValueRs: '',
+        addFreightRs: '',
+        taxableValueRs: '',
+        cgstAmountRs: '',
+        sgstAmountRs: '',
+        igstAmount: '',
+      },
+    ]);
+  };
+
+  // Template 2 - Remove a set of dynamic-entry fields
+  const removeTemplate2DynamicEntry = id => {
+    setTemplate2DynamicData(
+      template2DynamicData.filter(item => item.id !== id),
+    );
+  };
+
+  // Template 2 - Handle submission
+  const handleTemplate2Submit = () => {
+    console.log('Template 2 Single Entry Data:', template2Data);
+    console.log('Template 2 Dynamic Data:', template2DynamicData);
+    // Add your submission logic here
+  };
+
+  // Render a single dynamic-entry field for Template 1
+  const renderTemplate1DynamicItem = ({item}) => (
+    <View style={styles.dynamicItemContainer}>
+      {[
+        'descriptionOfGoods',
+        'hsnCode',
+        'numberOfUnits',
+        'qty',
+        'rate',
+        'amount',
+      ].map(field => (
+        <View key={field} style={styles.inputWrapper}>
+          <Text style={styles.label}>
+            {field.replace(/([A-Z])/g, ' $1').toUpperCase()}
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={field.replace(/([A-Z])/g, ' $1')}
+            value={item[field]}
+            onChangeText={text =>
+              handleTemplate1DynamicChange(item.id, field, text)
+            }
+          />
+        </View>
+      ))}
+      <TouchableOpacity
+        onPress={() => removeTemplate1DynamicEntry(item.id)}
+        style={styles.removeButton}>
+        <Text style={styles.removeButtonText}>Remove</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Render a single dynamic-entry field for Template 2
+  const renderTemplate2DynamicItem = ({item}) => (
+    <View style={styles.dynamicItemContainer}>
+      {[
+        'descriptionOfGoods',
+        'batchCode',
+        'noOfBundles',
+        'hsnSacCode',
+        'uom',
+        'grossWt',
+        'netWt',
+        'exMillRate',
+        'rebate',
+        'basic',
+        'basicValueRs',
+        'addFreightRs',
+        'taxableValueRs',
+        'cgstAmountRs',
+        'sgstAmountRs',
+        'igstAmount',
+      ].map(field => (
+        <View key={field} style={styles.inputWrapper}>
+          <Text style={styles.label}>
+            {field.replace(/([A-Z])/g, ' $1').toUpperCase()}
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={field.replace(/([A-Z])/g, ' $1')}
+            value={item[field]}
+            onChangeText={text =>
+              handleTemplate2DynamicChange(item.id, field, text)
+            }
+          />
+        </View>
+      ))}
+      <TouchableOpacity
+        onPress={() => removeTemplate2DynamicEntry(item.id)}
+        style={styles.removeButton}>
+        <Text style={styles.removeButtonText}>Remove</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Template 1 */}
+      <Text style={styles.heading}>Template 1</Text>
+      <View style={styles.singleEntryContainer}>
+        {Object.keys(template1Data).map(field => (
+          <View key={field} style={styles.inputWrapper}>
+            <Text style={styles.label}>
+              {field.replace(/([A-Z])/g, ' $1').toUpperCase()}
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder={field.replace(/([A-Z])/g, ' $1')}
+              value={template1Data[field]}
+              onChangeText={text => handleTemplate1SingleChange(field, text)}
+            />
+          </View>
+        ))}
+      </View>
+      <FlatList
+        data={template1DynamicData}
+        renderItem={renderTemplate1DynamicItem}
+        keyExtractor={item => item.id}
+        ListFooterComponent={
+          <Button title="Add More" onPress={addTemplate1DynamicEntry} />
+        }
+      />
+      <Button title="Submit Template 1" onPress={handleTemplate1Submit} />
+
+      {/* Template 2 */}
+      <Text style={styles.heading}>Template 2</Text>
+      <View style={styles.singleEntryContainer}>
+        {Object.keys(template2Data).map(field => (
+          <View key={field} style={styles.inputWrapper}>
+            <Text style={styles.label}>
+              {field.replace(/([A-Z])/g, ' $1').toUpperCase()}
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder={field.replace(/([A-Z])/g, ' $1')}
+              value={template2Data[field]}
+              onChangeText={text => handleTemplate2SingleChange(field, text)}
+            />
+          </View>
+        ))}
+      </View>
+      <FlatList
+        data={template2DynamicData}
+        renderItem={renderTemplate2DynamicItem}
+        keyExtractor={item => item.id}
+        ListFooterComponent={
+          <Button title="Add More" onPress={addTemplate2DynamicEntry} />
+        }
+      />
+      <Button title="Submit Template 2" onPress={handleTemplate2Submit} />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  singleEntryContainer: {
+    marginBottom: 16,
+  },
+  inputWrapper: {
+    marginBottom: 8,
+  },
+  input: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 8,
+    fontSize: 16,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  dynamicItemContainer: {
+    marginBottom: 16,
+    padding: 8,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 4,
+  },
+  removeButton: {
+    marginTop: 8,
+    backgroundColor: '#f44336',
+    padding: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  removeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});
+
+export default App;

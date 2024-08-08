@@ -1,0 +1,262 @@
+import React, {useEffect, useState} from 'react';
+import {GoogleGenerativeAI} from '@google/generative-ai';
+import {
+  Button,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  ActivityIndicator,
+  FlatList,
+  TextInput,
+  Alert,
+} from 'react-native';
+import DocumentScanner from 'react-native-document-scanner-plugin';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
+import {API_KEY} from '@env';
+import {Picker} from '@react-native-picker/picker';
+
+const App = () => {
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  const model = genAI.getGenerativeModel({model: 'gemini-1.5-flash'});
+  const [imageUri, setImageUri] = useState(null);
+  const [recognizedText, setRecognizedText] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('template1');
+
+  const templates = {
+    template1: [
+      'GSTIN Number',
+      'Invoice No',
+      'Date',
+      'Phone Number',
+      'Vehicle Number',
+      'Customer GSTN No',
+      'Description of Goods',
+      'HSN Code',
+      'Number of Units',
+      'Quantity',
+      'Rate',
+      'Amount',
+      'Subtotal',
+      'Charges',
+      'Total',
+      'E-way Bill No',
+    ],
+    template2: [
+      'Seller Name',
+      'IT PAN No',
+      'GSTIN',
+      'CIN',
+      'Invoice No',
+      'Date',
+      'Internal No',
+      'SO No & Date',
+      'Product',
+      'Dispatch From',
+      'IRN',
+      'Description of Goods',
+      'Batch/Code',
+      'No of Bundles/Coils',
+      'Sheets',
+      'HSN/SAC Code',
+      'UoM',
+      'Gross Wt',
+      'Net Wt',
+      'Ex-Mill Rate',
+      'Rebate',
+      'Basic',
+      'Basic Value Rs.',
+      'Add Freight Rs.',
+      'Taxable Value Rs.',
+      'CGST Amount in Rs.',
+      'SGST Amount in Rs.',
+      'IGST Amount',
+      'Total of Gross Wt',
+      'Net Wt',
+      'Basic Value Rs.',
+      'Add Freight Rs.',
+      'Taxable Value Rs.',
+      'CGST Amount in Rs.',
+      'SGST Amount in Rs.',
+      'IGST Amount',
+      'Total GST',
+      'Total Invoice',
+    ],
+  };
+
+  const openCamera = async () => {
+    try {
+      const {scannedImages} = await DocumentScanner.scanDocument();
+      if (scannedImages.length > 0) {
+        setImageUri(scannedImages[0]);
+        console.log(scannedImages);
+      } else {
+        Alert.alert('Scan canceled', 'No image was scanned.');
+      }
+    } catch (error) {
+      console.error('Error scanning document:', error);
+      Alert.alert('Error', 'Failed to open the camera. Please try again.');
+    }
+  };
+
+  const recognizeText = async () => {
+    if (imageUri) {
+      setIsLoading(true);
+      try {
+        const result = await TextRecognition.recognize(imageUri);
+        const prompt = `
+Extract the following details from the given text and format them into a JSON object:
+{
+  "invoice": {
+    "items": [
+      ${templates[selectedTemplate]
+        .map(field => `"${field.toLowerCase().replace(/ /g, '_')}": "string"`)
+        .join(',\n')}
+    ]
+  }
+}
+Do not include any other information such as terms and conditions. Ensure the keys are named exactly as specified.
+`;
+
+        const Gresult = await model.generateContent([prompt, result.text]);
+        const response = Gresult.response;
+        const formattedText = response.text().replace(/json|`/g, '');
+        const parsedData = JSON.parse(formattedText);
+        //console.log(formattedText);
+        console.log(
+          '_________________________PARSED DATA_______________________________________',
+        );
+        console.log(result.text);
+        setRecognizedText(parsedData.invoice);
+        if (parsedData.invoice && parsedData.invoice.items) {
+          setFormData(
+            parsedData.invoice.items.map((item, index) => ({
+              id: (index + 1).toString(),
+              ...item,
+            })),
+          );
+        } else {
+          throw new Error('Invalid data format');
+        }
+      } catch (error) {
+        Alert.alert('error', 'Please retake photo', [
+          {text: 'OK', onPress: () => openCamera()},
+        ]);
+        setRecognizedText('Error extracting text');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (imageUri) {
+      recognizeText();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUri]);
+
+  const handleChange = (id, field, value) => {
+    setFormData(prevData =>
+      prevData.map(item => (item.id === id ? {...item, [field]: value} : item)),
+    );
+  };
+
+  const handleSubmit = () => {
+    console.log({invoice: {items: formData}});
+    // Add your API submission logic here
+  };
+
+  const renderItem = ({item}) => (
+    <View style={styles.inputContainer}>
+      {templates[selectedTemplate].map(field => (
+        <View key={field}>
+          <Text style={styles.label}>{field}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={field}
+            value={item[field.toLowerCase().replace(/ /g, '_')]}
+            onChangeText={text =>
+              handleChange(
+                item.id,
+                field.toLowerCase().replace(/ /g, '_'),
+                text,
+              )
+            }
+          />
+        </View>
+      ))}
+      <Text style={styles.label}>
+        ------------------------------------------------------
+      </Text>
+    </View>
+  );
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <Picker
+        selectedValue={selectedTemplate}
+        style={{height: 50, width: 200}}
+        onValueChange={itemValue => setSelectedTemplate(itemValue)}>
+        <Picker.Item label="Template 1" value="template1" />
+        <Picker.Item label="Template 2" value="template2" />
+      </Picker>
+      <Button onPress={openCamera} title="Open Camera" />
+      {isLoading ? <ActivityIndicator size="large" color="#0000ff" /> : ''}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={formData}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.contentContainer}
+      />
+      <Button onPress={handleSubmit} title="Submit" />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  contentContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  headerContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  recognizedText: {
+    textAlign: 'justify',
+    fontSize: 16,
+    marginVertical: 16,
+  },
+  inputContainer: {
+    marginVertical: 8,
+    width: '80%',
+  },
+  input: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 8,
+    fontSize: 16,
+    marginVertical: 4,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 4,
+  },
+});
+
+export default App;

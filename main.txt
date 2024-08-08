@@ -1,11 +1,12 @@
-import React, {useState, useCallback, useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
+import {GoogleGenerativeAI} from '@google/generative-ai';
 import {
   SafeAreaView,
   StyleSheet,
   View,
   Platform,
   PermissionsAndroid,
-  FlatList,
+  ScrollView,
 } from 'react-native';
 import {
   Button,
@@ -21,66 +22,21 @@ import {
 } from 'react-native-paper';
 import DocumentScanner from 'react-native-document-scanner-plugin';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
-import {GoogleGenerativeAI} from '@google/generative-ai';
+//import {Picker} from '@react-native-picker/picker';
 import {API_KEY} from '@env';
 
-const RenderCommonFields = React.memo(({commonData, onChange, template}) => (
-  <Card style={styles.card}>
-    <Card.Title title="Common Fields" />
-    <Card.Content>
-      {template.commonFields.map((field, index) => (
-        <View key={index} style={styles.inputContainer}>
-          <TextInput
-            mode="outlined"
-            label={field}
-            value={commonData[field.toLowerCase().replace(/ /g, '_')]}
-            onChangeText={text =>
-              onChange(field.toLowerCase().replace(/ /g, '_'), text)
-            }
-            style={styles.input}
-          />
-        </View>
-      ))}
-    </Card.Content>
-  </Card>
-));
-
-const RenderItem = React.memo(({item, onChange, template}) => (
-  <Card style={styles.card}>
-    <Card.Content>
-      {template.itemFields.map((field, index) => (
-        <View key={index} style={styles.inputContainer}>
-          <TextInput
-            mode="outlined"
-            label={field}
-            value={item[field.toLowerCase().replace(/ /g, '_')]}
-            onChangeText={text =>
-              onChange(item.id, field.toLowerCase().replace(/ /g, '_'), text)
-            }
-            style={styles.input}
-          />
-        </View>
-      ))}
-      <Divider style={styles.divider} />
-    </Card.Content>
-  </Card>
-));
-
 const App = () => {
-  const genAI = useMemo(() => new GoogleGenerativeAI(API_KEY), []);
-  const model = useMemo(
-    () => genAI.getGenerativeModel({model: 'gemini-1.5-flash'}),
-    [genAI],
-  );
-
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  const model = genAI.getGenerativeModel({model: 'gemini-1.5-flash'});
   const [imageUri, setImageUri] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [commonData, setCommonData] = useState({});
   const [formData, setFormData] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState('template1');
-  const [ErrMsg, setErrMsg] = useState('');
+  const [ErrMsg, setErrMsg] = useState();
   const [visible, setVisible] = useState(false);
-
+  const showDialog = () => setVisible(true);
+  const hideDialog = () => setVisible(false);
   const templates = {
     template1: {
       commonFields: [
@@ -153,7 +109,7 @@ const App = () => {
     },
   };
 
-  const openCamera = useCallback(async () => {
+  const openCamera = async () => {
     try {
       if (
         Platform.OS === 'android' &&
@@ -166,19 +122,20 @@ const App = () => {
         return;
       }
       const {scannedImages, status} = await DocumentScanner.scanDocument();
-      if (scannedImages.length > 0 && status === 'success') {
+      if (scannedImages.length > 0 && status === 'sucess') {
         setImageUri(scannedImages[0]);
       } else {
         setErrMsg('Scan canceled. No image was scanned.');
         setVisible(true);
+        showDialog();
       }
     } catch (error) {
       setErrMsg('Failed to open the camera. Please try again.');
       setVisible(true);
     }
-  }, []);
+  };
 
-  const recognizeText = useCallback(async () => {
+  const recognizeText = async () => {
     if (imageUri) {
       setIsLoading(true);
       try {
@@ -228,13 +185,13 @@ Do not include any other information such as terms and conditions. Ensure the ke
         setIsLoading(false);
       }
     }
-  }, [imageUri, model, selectedTemplate]);
+  };
 
   useEffect(() => {
     if (imageUri) {
       recognizeText();
     }
-  }, [imageUri, recognizeText]);
+  }, [imageUri]);
 
   const handleCommonChange = (field, value) => {
     setCommonData(prevData => ({
@@ -250,83 +207,114 @@ Do not include any other information such as terms and conditions. Ensure the ke
   };
 
   const handleSubmit = () => {
-    console.log(
-      JSON.stringify({
-        invoice: {
-          common: commonData,
-          items: formData,
-        },
-      }),
-    );
+    console.log({
+      invoice: {
+        common: commonData,
+        items: formData,
+      },
+    });
     setCommonData({});
     setFormData([]);
     // API logic
   };
 
+  const renderCommonFields = () => (
+    <Card style={styles.card}>
+      <Card.Title title="Common Fields" />
+      <Card.Content>
+        {templates[selectedTemplate].commonFields.map((field, index) => (
+          <View key={index} style={styles.inputContainer}>
+            <TextInput
+              mode="outlined"
+              label={field}
+              value={commonData[field.toLowerCase().replace(/ /g, '_')]}
+              onChangeText={text =>
+                handleCommonChange(field.toLowerCase().replace(/ /g, '_'), text)
+              }
+              style={styles.input}
+            />
+          </View>
+        ))}
+      </Card.Content>
+    </Card>
+  );
+
+  const renderItem = ({item}) => (
+    <Card style={styles.card}>
+      <Card.Content>
+        {templates[selectedTemplate].itemFields.map((field, index) => (
+          <View key={index} style={styles.inputContainer}>
+            <TextInput
+              mode="outlined"
+              label={field}
+              value={item[field.toLowerCase().replace(/ /g, '_')]}
+              onChangeText={text =>
+                handleItemChange(
+                  item.id,
+                  field.toLowerCase().replace(/ /g, '_'),
+                  text,
+                )
+              }
+              style={styles.input}
+            />
+          </View>
+        ))}
+        <Divider style={styles.divider} />
+      </Card.Content>
+    </Card>
+  );
+
   return (
     <PaperProvider>
       <SafeAreaView style={styles.container}>
-        <View style={styles.headerContainer}>
-          <RadioButton.Group
-            onValueChange={value => setSelectedTemplate(value)}
-            value={selectedTemplate}>
-            <View style={styles.radioButtonRow}>
-              <View style={styles.radioButtonContainer}>
-                <RadioButton value="template1" />
-                <Text>Template 1</Text>
-              </View>
-              <View style={styles.radioButtonContainer}>
-                <RadioButton value="template2" />
-                <Text>Template 2</Text>
-              </View>
-            </View>
-          </RadioButton.Group>
-          <Button mode="contained" onPress={openCamera} style={styles.button}>
-            SCAN DOCCUMENT
-          </Button>
-          {isLoading && <ActivityIndicator animating={true} size="large" />}
-        </View>
+        <ScrollView contentContainerStyle={styles.contentContainer}>
+          <View style={styles.headerContainer}>
+            {/* <Picker
+            selectedValue={selectedTemplate}
+            style={styles.picker}
+            onValueChange={itemValue => setSelectedTemplate(itemValue)}>
+            <Picker.Item label="Template 1" value="template1" />
+            <Picker.Item label="Template 2" value="template2" />
+          </Picker> */}
 
-        {formData.length > 0 && (
-          <FlatList
-            ListHeaderComponent={
-              <RenderCommonFields
-                commonData={commonData}
-                onChange={handleCommonChange}
-                template={templates[selectedTemplate]}
-              />
-            }
-            data={formData}
-            renderItem={({item}) => (
-              <RenderItem
-                item={item}
-                onChange={handleItemChange}
-                template={templates[selectedTemplate]}
-              />
-            )}
-            keyExtractor={item => item.id}
-            ListFooterComponent={
-              <>
-                <Button
-                  mode="contained"
-                  onPress={handleSubmit}
-                  style={styles.submitButton}>
-                  Submit
-                </Button>
-                <Divider style={styles.divider} />
-              </>
-            }
-          />
-        )}
+            <RadioButton.Group
+              onValueChange={value => setSelectedTemplate(value)}
+              value={selectedTemplate}>
+              <View style={styles.radioButtonRow}>
+                <View style={styles.radioButtonContainer}>
+                  <RadioButton value="template1" />
+                  <Text>Template 1</Text>
+                </View>
+                <View style={styles.radioButtonContainer}>
+                  <RadioButton value="template2" />
+                  <Text>Template 2</Text>
+                </View>
+              </View>
+            </RadioButton.Group>
+
+            <Button mode="contained" onPress={openCamera} style={styles.button}>
+              Open Camera
+            </Button>
+            {isLoading && <ActivityIndicator animating={true} size="large" />}
+          </View>
+          {renderCommonFields()}
+          {formData.map(item => renderItem({item}))}
+          <Button
+            mode="contained"
+            onPress={handleSubmit}
+            style={styles.submitButton}>
+            Submit
+          </Button>
+        </ScrollView>
       </SafeAreaView>
       <Portal>
-        <Dialog visible={visible} onDismiss={() => setVisible(false)}>
+        <Dialog visible={visible} onDismiss={hideDialog}>
           <Dialog.Title>Error</Dialog.Title>
           <Dialog.Content>
             <Text variant="bodyMedium">{ErrMsg}</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setVisible(false)}>Done</Button>
+            <Button onPress={hideDialog}>Done</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -338,9 +326,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 10,
   },
-  contentContainer: {},
+  contentContainer: {
+    padding: 16,
+  },
   headerContainer: {
     marginBottom: 16,
   },
@@ -369,7 +358,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   submitButton: {
-    margin: 16,
+    marginTop: 16,
+    paddingVertical: 8,
   },
   divider: {
     marginVertical: 8,

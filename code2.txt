@@ -1,0 +1,298 @@
+import React, { useEffect, useState } from 'react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import {
+  Button,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  ActivityIndicator,
+  FlatList,
+  TextInput,
+  Alert,
+} from 'react-native';
+import DocumentScanner from 'react-native-document-scanner-plugin';
+import TextRecognition from '@react-native-ml-kit/text-recognition';
+import { API_KEY } from '@env';
+import { Picker } from '@react-native-picker/picker';
+
+const App = () => {
+  const genAI = new GoogleGenerativeAI(API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const [imageUri, setImageUri] = useState(null);
+  const [recognizedText, setRecognizedText] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('template1');
+
+  const templates = {
+    template1: {
+      singleEntryFields: [
+        'GSTIN Number',
+        'Invoice No',
+        'Date',
+        'Phone Number',
+        'Vehicle Number',
+        'Customer GSTN No',
+        'Subtotal',
+        'Weightment Charges',
+        'Coolie & Handling Charges',
+        'CGST',
+        'SGST',
+        'Round Off',
+        'Total',
+      ],
+      dynamicEntryFields: [
+        'Description of Goods',
+        'HSN Code',
+        'Number of Units',
+        'Quantity',
+        'Rate',
+        'Amount',
+      ],
+    },
+    template2: {
+      singleEntryFields: [
+        'Seller Name',
+        'IT PAN No',
+        'GSTIN',
+        'CIN',
+        'Invoice No',
+        'Date',
+        'Internal No',
+        'SO No & Date',
+        'Product',
+        'Dispatch From',
+        'IRN',
+        'Total Gross Wt',
+        'Total Net Wt',
+        'Total Basic Value Rs.',
+        'Total Add Freight Rs.',
+        'Total Taxable Value Rs.',
+        'Total CGST Amount in Rs.',
+        'Total SGST Amount in Rs.',
+        'Total IGST Amount',
+        'Total GST',
+        'Total Invoice',
+      ],
+      dynamicEntryFields: [
+        'Description of Goods',
+        'Batch/Code',
+        'No of Bundles/Coils/Sheets',
+        'HSN/SAC Code',
+        'UoM',
+        'Gross Wt',
+        'Net Wt',
+        'Ex-Mill Rate',
+        'Rebate',
+        'Basic',
+        'Basic Value Rs.',
+        'Add Freight Rs.',
+        'Taxable Value Rs.',
+        'CGST Amount in Rs.',
+        'SGST Amount in Rs.',
+        'IGST Amount',
+      ],
+    },
+  };
+
+  const openCamera = async () => {
+    try {
+      const { scannedImages } = await DocumentScanner.scanDocument();
+      if (scannedImages.length > 0) {
+        setImageUri(scannedImages[0]);
+      } else {
+        Alert.alert('Scan canceled', 'No image was scanned.');
+      }
+    } catch (error) {
+      console.error('Error scanning document:', error);
+      Alert.alert('Error', 'Failed to open the camera. Please try again.');
+    }
+  };
+
+  const recognizeText = async () => {
+    if (imageUri) {
+      setIsLoading(true);
+      try {
+        const result = await TextRecognition.recognize(imageUri);
+        const prompt = `
+Extract the following details from the given text and format them into a JSON object:
+{
+  "invoice": {
+    "singleEntryFields": {
+      ${templates[selectedTemplate].singleEntryFields
+        .map(field => `"${field.toLowerCase().replace(/ /g, '_')}": "string"`)
+        .join(',\n')}
+    },
+    "items": [
+      ${templates[selectedTemplate].dynamicEntryFields
+        .map(field => `"${field.toLowerCase().replace(/ /g, '_')}": "string"`)
+        .join(',\n')}
+    ]
+  }
+}
+Do not include any other information such as terms and conditions. Ensure the keys are named exactly as specified.
+`;
+
+        const Gresult = await model.generateContent([prompt, result.text]);
+        const response = Gresult.response;
+        const formattedText = response.text().replace(/json|`/g, '');
+        const parsedData = JSON.parse(formattedText);
+
+        // Handle single entry fields
+        const singleEntryData = {};
+        templates[selectedTemplate].singleEntryFields.forEach(field => {
+          singleEntryData[field.toLowerCase().replace(/ /g, '_')] =
+            parsedData.invoice.singleEntryFields?.[field.toLowerCase().replace(/ /g, '_')] || '';
+        });
+
+        // Handle dynamic entry fields
+        const dynamicEntryData = parsedData.invoice.items?.map((item, index) => ({
+          id: (index + 1).toString(),
+          ...item,
+        })) || [];
+
+        setFormData(dynamicEntryData);
+        setRecognizedText(singleEntryData);
+      } catch (error) {
+        Alert.alert('Error', 'Error extracting text. Please retake the photo.', [
+          { text: 'OK', onPress: () => openCamera() },
+        ]);
+        setRecognizedText({});
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (imageUri) {
+      recognizeText();
+    }
+  }, [imageUri]);
+
+  const handleChange = (id, field, value) => {
+    setFormData(prevData =>
+      prevData.map(item => (item.id === id ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const handleSubmit = () => {
+    console.log({ invoice: { singleEntryFields: recognizedText, items: formData } });
+    // Add your API submission logic here
+  };
+
+  const renderItem = ({ item }) => (
+    <View style={styles.inputContainer}>
+      {templates[selectedTemplate].dynamicEntryFields.map(field => (
+        <View key={field} style={styles.fieldContainer}>
+          <Text style={styles.label}>{field}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={field}
+            value={item[field.toLowerCase().replace(/ /g, '_')]}
+            onChangeText={text =>
+              handleChange(
+                item.id,
+                field.toLowerCase().replace(/ /g, '_'),
+                text,
+              )
+            }
+          />
+        </View>
+      ))}
+      <View style={styles.separator} />
+    </View>
+  );
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <Picker
+        selectedValue={selectedTemplate}
+        style={styles.picker}
+        onValueChange={itemValue => setSelectedTemplate(itemValue)}>
+        <Picker.Item label="Template 1" value="template1" />
+        <Picker.Item label="Template 2" value="template2" />
+      </Picker>
+      <Button onPress={openCamera} title="Open Camera" />
+      {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {Object.keys(recognizedText).length > 0 && (
+        <View style={styles.singleEntryContainer}>
+          {Object.entries(recognizedText).map(([field, value]) => (
+            <View key={field} style={styles.fieldContainer}>
+              <Text style={styles.label}>{field.replace(/_/g, ' ')}</Text>
+              <TextInput
+                style={styles.input}
+                value={value}
+                editable={false}
+              />
+            </View>
+          ))}
+        </View>
+      )}
+      <FlatList
+        ListHeaderComponent={renderHeader}
+        data={formData}
+        renderItem={renderItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.contentContainer}
+      />
+      <Button onPress={handleSubmit} title="Submit" />
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  contentContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  headerContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  picker: {
+    height: 50,
+    width: 200,
+  },
+  inputContainer: {
+    marginVertical: 8,
+    width: '80%',
+  },
+  fieldContainer: {
+    marginBottom: 8,
+  },
+  input: {
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 8,
+    fontSize: 16,
+    marginVertical: 4,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 4,
+  },
+  singleEntryContainer: {
+    marginVertical: 16,
+    width: '80%',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#ccc',
+    marginVertical: 8,
+  },
+});
+
+export default App;
